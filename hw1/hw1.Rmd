@@ -1,0 +1,261 @@
+---
+title: "Homework 1 - readable and efficient R code"
+author: "Shuang Du"
+date: "`r format(Sys.time(), '%m/%d/%Y')`"
+output: rmarkdown::github_document
+---
+
+# Question 1 - "function-alize" this code
+
+Read over the code below and perform the following:
+
+* Wrap it into a function `foobar0` which has arguments `x` and `z`
+  and which returns the vector `x` at the end of the following code.
+* Rewrite this into a function `foobar` which is easier to read, by
+  reducing repetitive code. E.g. `foobar` might call a function to
+  check the input, and another function to perform the three lines of
+  computation. 
+* Check that the two versions produce the same output using the
+  function `all.equal`.
+
+```{r}
+set.seed(1)
+x <- rnorm(100)
+z <- rnorm(100)
+if (sum(x >= .001) < 1) {
+  stop("step 1 requires 1 observation(s) with value >= .001")
+}
+fit <- lm(x ~ z)
+r <- fit$residuals
+x <- sin(r) + .01
+if (sum(x >= .002) < 2) {
+  stop("step 2 requires 2 observation(s) with value >= .002")
+}
+fit <- lm(x ~ z)
+r <- fit$residuals
+x <- 2 * sin(r) + .02
+if (sum(x >= .003) < 3) {
+  stop("step 3 requires 3 observation(s) with value >= .003")
+}
+fit <- lm(x ~ z)
+r <- fit$residuals
+x <- 3 * sin(r) + .03
+if (sum(x >= .004) < 4) {
+  stop("step 4 requires 4 observation(s) with value >= .004")
+}
+fit <- lm(x ~ z)
+r <- fit$residuals
+x <- 4 * sin(r) + .04
+x
+```
+The function that can wrap up the above calculation is:
+
+```{r}
+footbar0<- function(x,z){
+  if (sum(x >= .001) < 1) {
+    stop("step 1 requires 1 observation(s) with value >= .001")
+  }
+  fit <- lm(x ~ z)
+  r <- fit$residuals
+  x <- sin(r) + .01
+  if (sum(x >= .002) < 2) {
+    stop("step 2 requires 2 observation(s) with value >= .002")
+  }
+  fit <- lm(x ~ z)
+  r <- fit$residuals
+  x <- 2 * sin(r) + .02
+  if (sum(x >= .003) < 3) {
+    stop("step 3 requires 3 observation(s) with value >= .003")
+  }
+  fit <- lm(x ~ z)
+  r <- fit$residuals
+  x <- 3 * sin(r) + .03
+  if (sum(x >= .004) < 4) {
+    stop("step 4 requires 4 observation(s) with value >= .004")
+  }
+  fit <- lm(x ~ z)
+  r <- fit$residuals
+  x <- 4 * sin(r) + .04
+  return (x)
+}
+
+```
+
+A more efficient function can be written as:
+```{r}
+# Help check the condition to proceed
+fooCheck <- function(x, i){
+  if (sum(x >= (.001*i)) < i) {
+  stop(paste0("step ", i, " requires ", i, " observation(s) with value >= ", i*.001))
+}
+}
+
+# Perform the three lines of computation
+fooComp <- function(x, z, i){
+  x <- i * sin(lm(x ~ z)$residuals) + .01 * i
+  return(x)
+}
+
+# A new version of the function which gets rid of repetitive sections
+footbar <- function(x, z){
+  for (i in 1:4){
+    fooCheck(x, i)
+    x <- fooComp(x, z, i)
+  }
+  return(x)
+}
+```
+
+Other attemps:
+```{r}
+#attemp1
+footbar1 <- function(x, z) {
+  lapply(seq_len(4), function(i) (i * sin(lm(x ~ z)$residuals) + .01 * i))
+  return (x)
+}
+```
+
+
+```{r}
+#attemp2
+footbar2 <- function(x, z) {
+  for (i in 1:4) {
+    x <- i * sin(lm(x ~ z)$residuals) + .01 * i
+    if (sum(x >= .001 * (i)) < i) {
+      stop("step",i, "requires",i, "observation(s) with value >= .001")
+    }
+  }
+  return (x)
+}
+```
+
+
+```{r}
+library(microbenchmark)
+all.equal(footbar0(x,z),footbar(x,z))
+microbenchmark(footbar0(x,z),footbar(x,z),footbar1(x,z),footbar2(x,z))
+```
+### Conclusion: The new function `footbar(x,z)` has get rid of repetitive codes and has the same output as the original function `footbar0(x,z)`.
+
+
+# Question 2 - vectorize this code and benchmark
+
+* Take the following function `f0` and rewrite it as a function `f`,
+  which is faster and easier to read, by removing the loop of `i` from
+  1 to `m`.
+* Benchmark `f` and `f0` using `microbenchmark`. How much faster is `f`?
+
+```{r}
+n <- 30
+p <- 50
+p2 <- 25
+m <- 1000
+set.seed(1)
+x <- matrix(rnorm(n*p),nrow=n,ncol=p)
+b <- matrix(rnorm(m*p),nrow=m,ncol=p)
+a <- matrix(rnorm(m*p2),nrow=m,ncol=p2)
+
+f0 <- function(x,b,a) {
+  out <- numeric(0)
+  for (i in seq_len(m)) {
+    bb <- b[i,]
+    aa <- a[i,]
+    out <- c(out, sum(x %*% bb) + sum(aa))
+  }
+  return (out)
+}
+```
+
+```{r}
+library(microbenchmark)
+#attemp1
+f00<- function(x,b,a) {
+  re <- sapply(seq_len(m), function(i) (sum(x %*% b[i,]) + sum(a[i,])))
+  unname(re)
+}
+```
+
+```{r}
+#attemp2
+f1 <- function(x,b,a) {
+  ans <- numeric(length(m))
+  for (i in seq_len(m)) {
+    ans[i] <- sum(x %*% b[i,]) + sum(a[i,])
+  }
+  ans
+}
+
+```
+
+```{r}
+#attemp3
+s = rowSums(a)
+f2 <- function(x,b,a){
+  y <- function(t){
+    x %*% t
+  }
+  sum(apply(b,1,y)) + s
+} 
+```
+
+```{r}
+# attemp4 
+f <- function(x, b, a){
+  colSums(x %*% t(b))+rowSums(a)
+}
+```
+
+```{r}
+microbenchmark(f0(x,b,a), f00(x,b,a),f1(x,b,a),f(x,b,a))
+```
+### Conclusion: function f(x,b,a) has the best performance on runtime, saved more than 50% per cent of original runtime.
+
+# Question 3 - build a faster t-test
+
+* Rewrite the following function `getT0` which computes `m`
+  two-sample t-tests (equal variance) between two groups as a function
+  `getT`, which is faster by using vectorized operations over the `m`
+  sets of observations. (There are functions in R packages, such as
+  `genefilter::rowttests` which will quickly perform this operation,
+  but I want you to write your own function using simple R functions
+  like `rowSums`, etc.)
+* Benchmark `getT` and `getT0`. How much faster is `getT`?
+
+```{r}
+m <- 400
+n <- 50
+little.n <- n/2
+set.seed(1)
+x <- matrix(rnorm(m*n),nrow=m,ncol=n)
+f <- gl(2,little.n)
+
+getT0 <- function(x, f) {
+  ts <- sapply(seq_len(m), function(i) t.test(x[i,] ~ f, var.equal=TRUE)$statistic)
+  unname(ts)
+}
+```
+
+
+```{r}
+# calculate the variance for each row in a matrix
+rowVars <- function(x) {
+  rowSums((x-rowMeans(x))^2) / (ncol(x)-1)
+}
+
+# A faster t test function
+getT <- function (x, f){
+  xbar.diff <- rowMeans(x[, which(f==1)]) - rowMeans(x[, which(f==2)]) # calculate the difference in row means
+  n1 <- sum(f==1) # sample size in group 1
+  n2 <- sum(f==2) # sample size in group 2
+  sp.sq <- ((n1-1)*rowVars(x[, which(f==1)])+(n2-1)*rowVars(x[, which(f==2)]))/(n1 + n2 - 2) #s_p squared
+  ts <- xbar.diff/sqrt(sp.sq*(1/n1 + 1/n2)) # output a vector of t test statistics
+  return(ts)
+}
+```
+
+```{r}
+all.equal(getT0(x,f),getT(x,f))
+microbenchmark(getT0(x,f),getT(x,f))
+```
+
+### Conclusion: By rewrting the function, `getT(x,f)` is more efficieny than the original function.
