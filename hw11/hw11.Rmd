@@ -1,0 +1,115 @@
+---
+title: "Homework 11 - Machine learning essentials"
+author: "Shuang Du"
+date: "`r format(Sys.time(), '%m/%d/%Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(caret)
+library(ggplot2)
+```
+
+# Use of `caret` with various methods
+
+Run three machine learning models over the following training dataset
+with features `x` and labels `y`. You can use default tuning, e.g.
+bootstrap based resampling for tuning, as set by `trainControl`.
+
+-   SVM with radial kernel `"svmRadial"`
+-   Random forest `"rf"`
+-   Gradient boosting machine `"gbm"` (use `verbose=FALSE`)
+
+Record the time to train, and the best Kappa value for each method over
+the tuning grid (`rf` does not use tuning parameters via `train` for
+this dataset). Which method obtains the best Kappa?
+
+Finally, make a `pointrange` plot (see `geom_pointrange`), with the
+optimal Kappa and the SD for the optimal Kappa. Is there a clear winner,
+or all the methods mostly overlapping?
+
+```{r}
+data(faithful)
+n <- nrow(faithful)
+faithful <- data.frame(lapply(faithful, scale))
+plot(faithful)
+faithful$cl <- factor(kmeans(faithful, centers=2)$cluster)
+plot(faithful[,1:2], col=faithful$cl)
+# make it more challenging
+set.seed(1)
+faithful[,1] <- faithful[,1] + rt(n,df=5)/2
+faithful[,2] <- faithful[,2] + rt(n,df=5)/2
+plot(faithful[,1:2], col=faithful$cl)
+x <- faithful[,1:2]
+y <- faithful[,3]
+```
+
+The first method-svm:
+
+```{r}
+# SVM with radial kernel
+start1 = Sys.time()
+svm_model <- train(x, y, method="svmRadial")
+end1 = Sys.time()
+out1 <- svm_model$results[rownames(svm_model$bestTune),]
+kappa1 <- out1$Kappa
+kappasd1 <- out1$KappaSD
+time1 = end1-start1
+```
+
+I keep having this error when I try to install 'randomForest':
+ERROR: compilation failed for package ‘randomForest’
+* removing ‘/Library/Frameworks/R.framework/Versions/4.0/Resources/library/randomForest’
+Warning in install.packages :
+  installation of package ‘/var/folders/lk/j5zx9dgd0q1_1cdkddh3c6z40000gn/T//RtmpLpJ1mJ/downloaded_packages/randomForest_4.6-14.tar.gz’ had non-zero exit status
+  
+So the code for random forest will not be executable here.
+
+```{r}
+#Random forest   
+
+#start2 = Sys.time()
+
+#rf_model <- train(x, y, method="rf")
+
+#end2 = Sys.time()
+
+#out2 <- rf_model$results[rownames(rf_model$bestTune),]
+
+#kappa2 <- out2$Kappa
+
+#kappasd2 <- out2$KappaSD
+
+#time2 = end2-start2 
+```
+
+
+```{r}
+# Gradient boosting machine
+start3 = Sys.time()
+boost3 <- train(x, y, method="gbm", verbose=FALSE)
+end3 = Sys.time()
+out3 <- boost3$results[rownames(boost3$bestTune),]
+kappa3 <- out3$Kappa
+kappasd3 <- out3$KappaSD
+time3 = end3-start3
+```
+
+```{r}
+df=data.frame(Method=c("svmRadial","gbm"), Kappa=c(kappa1,kappa3), KappaSD=c(kappasd1,  kappasd3), Time=c(time1,time3))
+df
+```
+
+Based on the results, we can see that SVM with radial kernel has the
+best Kappa.
+
+Now, we make a `pointrange` plot, with the optimal Kappa and the SD for
+the optimal Kappa.
+
+```{r}
+r = 1
+d=data.frame(method=c("svmRadial","gbm"), kappa=c(kappa1,kappa3), lower=c(kappa1-r*kappasd1,kappa3-r*kappasd3), upper=c(kappa1+r*kappasd1,kappa3+r*kappasd3))
+ggplot() + geom_pointrange(data=d, mapping=aes(x=method, y=kappa, ymin=upper, ymax=lower))
+```
+
+From the final visualization `pointrange` plot, we can see that there is no big difference between the methods we discussed above.
